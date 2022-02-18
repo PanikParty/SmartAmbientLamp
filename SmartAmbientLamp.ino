@@ -1,6 +1,5 @@
 #include "config.h"
 
-int SENSOR_PIN = A0;    // select the input pin for the potentiometer
 int ledPin = 13;      // select the pin for the LED
 
 // software SPI
@@ -33,7 +32,7 @@ sensors_event_t getAccelData () {
   return event;  
 }
 
-int avg (int * arr, uint8_t len) {
+float avg (int * arr, uint8_t len) {
   // bypass error
   if (len <=0)
     return 0;
@@ -48,17 +47,17 @@ int avg (int * arr, uint8_t len) {
 sensors_event_t getAmbientConditions () {
 #define SAMPLES 10
   static uint8_t index = 0;
-  static int lightSamples[SAMPLES] = {0};
+  static int lightSamples[SAMPLES] = {5};
   // read the value from the sensor; scale it to max brightness 0-255 (256/1024)
-  #define MINIMUM 5
-  #define MAXIMUM 255
-  int sensorValue = analogRead(SENSOR_PIN)/4;
-  lightSamples [index] = (sensorValue+MINIMUM)% (MAXIMUM-MINIMUM +1) - MINIMUM;
-  
-  Serial.print("[SENSOR_PIN] ");
-  Serial.print(sensorValue);
-  Serial.print("...\n");
-  strip.setBrightness(avg(lightSamples, SAMPLES)); // Set BRIGHTNESS (min = 5)
+  #define MINIMUM 10
+  #define MAXIMUM 100
+  lightSamples [index] = analogRead(SENSOR_PIN)/2;
+  lightSamples [index] = lightSamples [index] < MINIMUM ? MINIMUM : lightSamples [index];
+  index = (1+index)%SAMPLES;
+  float level = MAXIMUM - avg(lightSamples, SAMPLES);
+  level = level > MINIMUM ? level : MINIMUM; 
+  Serial && Serial.println (level);
+  strip.setBrightness(level); // Set BRIGHTNESS (min = 5)
 
   return getAccelData ();
 //  clickDetect ();  
@@ -84,9 +83,10 @@ uint8_t colorZap(uint32_t color, int wait) {
   return 1;
 }
 
-uint8_t colorFill (uint32_t color, int wait) {
-  
-}
+//uint8_t colorFill (uint32_t color, int wait) {
+//  
+//}
+
 // Fill strip pixels one after another with a color. Strip is NOT cleared
 // first; anything there will be covered pixel by pixel. Pass in color
 // (as a single 'packed' 32-bit value, which you can get by calling
@@ -416,29 +416,36 @@ void setupSerial () {
   digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
   
   // wait for serial monitor to open
-  while (!Serial);
-  digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW  
+//  while (!Serial);
+  digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
+  #ifdef PROJ_DEBUG  
   Serial.print("Serial Com Ready!");
+  #endif
 }
 
 
 void setupAccelSensor () {
-
+#ifdef PROJ_DEBUG  
   Serial.println("LIS3DH test!");
-
+#endif
   if (! lis.begin(0x18)) {   // change this to 0x19 for alternative i2c address
-    Serial.println("Couldnt start");
+#ifdef PROJ_DEBUG  
+Serial.println("Couldnt start");
+#endif
     while (1) yield();
   }
+#ifdef PROJ_DEBUG  
   Serial.println("LIS3DH found!");
-
+#endif
   lis.setRange(LIS3DH_RANGE_4_G);   // 2, 4, 8 or 16 G!
-
+#ifdef PROJ_DEBUG  
   Serial.print("Range = "); Serial.print(2 << lis.getRange());
   Serial.println("G");
-
+#endif
   // lis.setDataRate(LIS3DH_DATARATE_50_HZ);
+#ifdef PROJ_DEBUG  
   Serial.print("Data rate set to: ");
+#endif
   switch (lis.getDataRate()) {
     case LIS3DH_DATARATE_1_HZ: Serial.println("1 Hz"); break;
     case LIS3DH_DATARATE_10_HZ: Serial.println("10 Hz"); break;
@@ -471,7 +478,9 @@ void setupNeoPixel () {
   strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
   strip.show();            // Turn OFF all pixels ASAP
   strip.setBrightness(50); // Set BRIGHTNESS to about 1/5 (max = 255)
+#ifdef PROJ_DEBUG    
   Serial.println("NeoPixel Setup Complete");
+#endif
 }
 void setup() {
   // if analog input pin 0 is unconnected, random analog
@@ -482,7 +491,9 @@ void setup() {
  setupSerial ();
  setupAccelSensor ();
  setupNeoPixel ();
+#ifdef PROJ_DEBUG   
  Serial.println("All Setup Complete");
+#endif
 }
 
 
@@ -492,8 +503,9 @@ void runLightingEffect () {
   static int redFactor = 121;
   static int greenFactor = 121;
   static int blueFactor = 121;
-  
+#ifdef PROJ_DEBUG    
   Serial.print("mode:  "); Serial.print(mode); Serial.print(", on:  "); Serial.print(on);
+#endif  
   if (on == 0){
     sensors_event_t  event = getAmbientConditions (); 
     if (event.acceleration.z >= 0){
@@ -542,12 +554,13 @@ void runLightingEffect () {
       blueFactor += (event.acceleration.z-10);
       if (blueFactor < 0) blueFactor =1;
       if (blueFactor > 122) blueFactor = 122;
-      
+#ifdef PROJ_DEBUG        
       Serial.print("mode:  "); Serial.print(mode);
       Serial.print(", redFactor:  "); Serial.print(redFactor);
       Serial.print(", greenFactor:  "); Serial.print(greenFactor);
       Serial.print(", blueFactor:  "); Serial.print(blueFactor);
       Serial.println(); 
+#endif
       on = colorZap(strip.Color(1+(2*redFactor), 1+(2*greenFactor), 1+(2*blueFactor)), 5);
       
     }
@@ -574,13 +587,19 @@ uint8_t clickDetect (sensors_event_t & event) {
   static int z_orientation = 1;
   uint8_t click = lis.getClick();
   if ((click != 0) && (click & 0x30)){
+#ifdef PROJ_DEBUG      
     Serial.print("Click detected (0x"); Serial.print(click, HEX); Serial.print("): ");
+#endif    
     if (click & 0x10) {
+#ifdef PROJ_DEBUG        
       Serial.print(" single click");
+#endif
      // ++mode;
     }
     if (click & 0x20) {
+#ifdef PROJ_DEBUG        
       Serial.print(" double click");
+#endif      
      // --mode;
     }
   } else {
@@ -596,10 +615,11 @@ uint8_t clickDetect (sensors_event_t & event) {
       }          
     }
   }
-    Serial.print("zOrientation ("); Serial.print(z_orientation); Serial.print("): ");
-    // keep the mode between 0 and 7
-    mode = mode %8;
-    Serial.println();
+#ifdef PROJ_DEBUG  
+  Serial.print("zOrientation ("); Serial.print(z_orientation); Serial.print("): ");
+#endif
+// keep the mode between 0 and 7
+  mode = mode %8;
   
   return mode;  
 }
