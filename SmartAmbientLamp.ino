@@ -1,14 +1,14 @@
 #include "config.h"
 
-int sensorPin = A5;    // select the input pin for the potentiometer
+int SENSOR_PIN = A0;    // select the input pin for the potentiometer
 int ledPin = 13;      // select the pin for the LED
 
 // software SPI
-Adafruit_LIS3DH lis = Adafruit_LIS3DH(LIS3DH_CS, LIS3DH_MOSI, LIS3DH_MISO, LIS3DH_CLK);
+// Adafruit_LIS3DH lis = Adafruit_LIS3DH(LIS3DH_CS, LIS3DH_MOSI, LIS3DH_MISO, LIS3DH_CLK);
 // hardware SPI
 //Adafruit_LIS3DH lis = Adafruit_LIS3DH(LIS3DH_CS);
 // I2C
-//Adafruit_LIS3DH lis = Adafruit_LIS3DH();
+Adafruit_LIS3DH lis = Adafruit_LIS3DH();
 
 sensors_event_t getAccelData () {
   lis.read();      // get X Y and Z data at once
@@ -21,21 +21,44 @@ sensors_event_t getAccelData () {
   sensors_event_t event;
   lis.getEvent(&event);
 
+#ifdef PROJ_DEBUG
   /* Display the results (acceleration is measured in m/s^2) */
   Serial.print("\t\tX: "); Serial.print(event.acceleration.x);
   Serial.print(" \tY: "); Serial.print(event.acceleration.y);
   Serial.print(" \tZ: "); Serial.print(event.acceleration.z);
-//  Serial.println(" m/s^2 ");
+  Serial.println(" m/s^2 ");
 
   Serial.println();
+#endif
   return event;  
 }
 
+int avg (int * arr, uint8_t len) {
+  // bypass error
+  if (len <=0)
+    return 0;
+    
+  int sum = 0;
+  for (uint8_t ind = 0; ind < len; ++ind) {
+    sum += arr[ind];
+  }
+  return sum/len;
+}
+
 sensors_event_t getAmbientConditions () {
+#define SAMPLES 10
+  static uint8_t index = 0;
+  static int lightSamples[SAMPLES] = {0};
   // read the value from the sensor; scale it to max brightness 0-255 (256/1024)
-  int sensorValue = analogRead(sensorPin)/4;
-  // Serial.print(str+"[Sensor] A5 "+sensorValue+"...\n");
-  strip.setBrightness(sensorValue+5); // Set BRIGHTNESS (min = 5)
+  #define MINIMUM 5
+  #define MAXIMUM 255
+  int sensorValue = analogRead(SENSOR_PIN)/4;
+  lightSamples [index] = (sensorValue+MINIMUM)% (MAXIMUM-MINIMUM +1) - MINIMUM;
+  
+  Serial.print("[SENSOR_PIN] ");
+  Serial.print(sensorValue);
+  Serial.print("...\n");
+  strip.setBrightness(avg(lightSamples, SAMPLES)); // Set BRIGHTNESS (min = 5)
 
   return getAccelData ();
 //  clickDetect ();  
@@ -448,7 +471,7 @@ void setupNeoPixel () {
   strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
   strip.show();            // Turn OFF all pixels ASAP
   strip.setBrightness(50); // Set BRIGHTNESS to about 1/5 (max = 255)
- 
+  Serial.println("NeoPixel Setup Complete");
 }
 void setup() {
   // if analog input pin 0 is unconnected, random analog
@@ -459,6 +482,7 @@ void setup() {
  setupSerial ();
  setupAccelSensor ();
  setupNeoPixel ();
+ Serial.println("All Setup Complete");
 }
 
 
@@ -468,7 +492,8 @@ void runLightingEffect () {
   static int redFactor = 121;
   static int greenFactor = 121;
   static int blueFactor = 121;
-  // Serial.print("mode:  "); Serial.print(mode); Serial.print(", on:  "); Serial.print(on);
+  
+  Serial.print("mode:  "); Serial.print(mode); Serial.print(", on:  "); Serial.print(on);
   if (on == 0){
     sensors_event_t  event = getAmbientConditions (); 
     if (event.acceleration.z >= 0){
