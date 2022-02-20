@@ -1,5 +1,6 @@
 #include "config.h"
 
+
 int ledPin = 13;      // select the pin for the LED
 
 // software SPI
@@ -45,7 +46,7 @@ float avg (int * arr, uint8_t len) {
 }
 
 sensors_event_t getAmbientConditions () {
-#define SAMPLES 10
+#define SAMPLES 20
   static uint8_t index = 0;
   static int lightSamples[SAMPLES] = {5};
   // read the value from the sensor; scale it to max brightness 0-255 (256/1024)
@@ -482,15 +483,34 @@ void setupNeoPixel () {
   Serial.println("NeoPixel Setup Complete");
 #endif
 }
+
+#include "Adafruit_DotStar.h"
+void setupDotStar () {
+#ifdef TRINKET_M0
+#define DOTSTAR_DATPIN    7 // trinket m0
+#define DOTSTAR_CLKPIN   8 // trinket m0
+
+  // Dotstar RGB LED
+  Adafruit_DotStar dotStar = Adafruit_DotStar(1, DOTSTAR_DATPIN,DOTSTAR_CLKPIN, DOTSTAR_BGR);  
+  dotStar.begin();
+  dotStar.show();
+ #endif
+}
+
 void setup() {
   // if analog input pin 0 is unconnected, random analog
   // noise will cause the call to randomSeed() to generate
   // different seed numbers each time the sketch runs.
   // randomSeed() will then shuffle the random function.
   randomSeed(analogRead(0));
- setupSerial ();
- setupAccelSensor ();
- setupNeoPixel ();
+  setupSerial ();
+  setupAccelSensor ();
+  setupNeoPixel ();
+  // turn off builtin LED
+  digitalWrite(ledPin, LOW);
+  // turn off builtin neoPixel dotStar on Trinket M0
+  setupDotStar ();
+  
 #ifdef PROJ_DEBUG   
  Serial.println("All Setup Complete");
 #endif
@@ -503,9 +523,9 @@ void runLightingEffect () {
   static int redFactor = 121;
   static int greenFactor = 121;
   static int blueFactor = 121;
-#ifdef PROJ_DEBUG    
-  Serial.print("mode:  "); Serial.print(mode); Serial.print(", on:  "); Serial.print(on);
-#endif  
+
+  Serial && Serial.print("mode:  "); Serial && Serial.print(mode); Serial && Serial.print(", on:  "); Serial && Serial.print(on);
+
   if (on == 0){
     sensors_event_t  event = getAmbientConditions (); 
     if (event.acceleration.z >= 0){
@@ -626,10 +646,8 @@ uint8_t clickDetect (sensors_event_t & event) {
 
 void loop() {
 
-  digitalWrite(ledPin, HIGH);
   runLightingEffect ();
   // turn the ledPin on
   // turn the ledPin off:
-  digitalWrite(ledPin, LOW);
  
 }
